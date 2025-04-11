@@ -28,10 +28,19 @@ jobs:
           sudo install -c -m 0755 vcluster /usr/local/bin && \
           vcluster --version
 
-      # 4️⃣ Create vCluster inside AKS
-      - name: Create vCluster
+      - name: Create or Connect to vCluster
         run: |
-          vcluster create my-vcluster -n vcluster-namespace --connect=false
+          # Check if vCluster already exists
+          if vcluster list -n vcluster-namespace | grep -q "my-vcluster"; then
+            echo "vCluster 'my-vcluster' already exists - reusing it"
+          else
+            echo "Creating new vCluster..."
+            vcluster create my-vcluster -n vcluster-namespace --connect=false
+          fi
+          
+          # Always connect to ensure KUBECONFIG is set
+          vcluster connect my-vcluster -n vcluster-namespace --update-current=false > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
 
       # 5️⃣ Install Helm & kubectl
       - name: Install Helm
