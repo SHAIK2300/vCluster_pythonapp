@@ -28,9 +28,11 @@ jobs:
           sudo install -c -m 0755 vcluster /usr/local/bin && \
           vcluster --version
 
-      # 4️⃣ Create vCluster inside AKS
       - name: Create vCluster
         run: |
+          # Use clean temporary directory
+          mkdir -p /tmp/vcluster-workdir
+          cd /tmp/vcluster-workdir
           vcluster create my-vcluster -n vcluster-namespace --connect=false
 
       # 5️⃣ Install Helm & kubectl
