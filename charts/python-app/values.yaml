@@ -1,0 +1,11 @@
+replicaCount: 1
+
+image:
+  repository: yourusername/python-app
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 5000

@@ -1,0 +1,64 @@
+name: CD Pipeline - Deploy to vCluster on AKS
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # 1️⃣ Login to Azure
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # 2️⃣ Connect to AKS
+      - name: Get AKS Credentials
+        run: |
+          az aks get-credentials --resource-group ${{ secrets.AKS_RESOURCE_GROUP }} --name ${{ secrets.AKS_CLUSTER_NAME }} --overwrite-existing
+
+      # 3️⃣ Install vCluster CLI
+      - name: Install vCluster
+        run: |
+          curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64" && \
+          sudo install -c -m 0755 vcluster /usr/local/bin && \
+          vcluster --version
+
+      # 4️⃣ Create vCluster inside AKS
+      - name: Create vCluster
+        run: |
+          vcluster create my-vcluster -n vcluster-namespace --connect=false
+
+      # 5️⃣ Install Helm & kubectl
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: 'v3.7.1'
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v1
+
+      # 6️⃣ Connect to vCluster
+      - name: Connect to vCluster
+        run: |
+          vcluster connect my-vcluster -n vcluster-namespace --update-current=false > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+
+      # 7️⃣ Deploy Python App
+      - name: Deploy Python App
+        run: |
+          helm upgrade --install python-app ./charts/python-app \
+            --set image.repository=${{ secrets.DOCKER_HUB_USERNAME }}/python-app \
+            --set image.tag=latest \
+            --namespace python-app \
+            --create-namespace
+
+      # 8️⃣ Verify Deployment
+      - name: Verify Deployment
+        run: |
+          kubectl wait --for=condition=available deployment/python-app -n python-app --timeout=120s
+          kubectl get pods -n python-app
