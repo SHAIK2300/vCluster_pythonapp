@@ -28,57 +28,10 @@ jobs:
           sudo install -c -m 0755 vcluster /usr/local/bin && \
           vcluster --version
 
-      - name: Handle vCluster
+      # 4️⃣ Create vCluster inside AKS
+      - name: Create vCluster
         run: |
-          # Set up clean working directory to avoid conflicts
-          WORKDIR=$(mktemp -d)
-          cd $WORKDIR
-          
-          # Check for existing vCluster (with retries)
-          MAX_RETRIES=3
-          retry_count=0
-          
-          while [ $retry_count -lt $MAX_RETRIES ]; do
-            if vcluster list -n vcluster-namespace 2>/dev/null | grep -q "my-vcluster.*Running"; then
-              echo "✅ vCluster 'my-vcluster' exists and is running"
-              break
-            else
-              ((retry_count++))
-              if [ $retry_count -eq $MAX_RETRIES ]; then
-                echo "ℹ️ No running vCluster found - creating new one"
-                vcluster create my-vcluster -n vcluster-namespace \
-                  --connect=false \
-                  --chart-path $WORKDIR \
-                  --upgrade
-                
-                # Verify creation
-                if ! vcluster list -n vcluster-namespace | grep -q "my-vcluster"; then
-                  echo "❌ vCluster creation failed"
-                  exit 1
-                fi
-              else
-                echo "⚠️ vCluster not found (attempt $retry_count/$MAX_RETRIES), retrying..."
-                sleep 5
-              fi
-            fi
-          done
-
-          # Connect to vCluster with validation
-          echo "🔗 Connecting to vCluster..."
-          vcluster connect my-vcluster -n vcluster-namespace \
-            --update-current=false \
-            --server=https://localhost:8443 \
-            > kubeconfig.yaml
-          
-          export KUBECONFIG=$PWD/kubeconfig.yaml
-          
-          # Verify connection
-          if ! kubectl get ns >/dev/null 2>&1; then
-            echo "❌ Failed to connect to vCluster"
-            exit 1
-          fi
-          
-          echo "::set-output name=kubeconfig::$PWD/kubeconfig.yaml"
+          vcluster create my-vcluster -n vcluster-namespace --connect=false
 
       # 5️⃣ Install Helm & kubectl
       - name: Install Helm
